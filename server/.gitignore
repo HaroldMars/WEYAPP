@@ -1,0 +1,8 @@
+node_modules/
+.env
+uploads/avatars/*
+uploads/chat-images/*
+!uploads/avatars/.gitkeep
+!uploads/chat-images/.gitkeep
+*.log
+.DS_Store
