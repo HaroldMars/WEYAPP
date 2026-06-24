@@ -9,6 +9,7 @@
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
+
 /**
  * Sends an email via Resend's HTTP API. In development, if RESEND_API_KEY is not configured,
  * it logs the email to the console instead of throwing, so you can keep developing without
