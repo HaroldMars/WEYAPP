@@ -6,3 +6,6 @@ uploads/chat-images/*
 !uploads/chat-images/.gitkeep
 *.log
 .DS_Store
+.env.example
+*.env.example
+
