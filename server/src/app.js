@@ -26,6 +26,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+
 // Serve locally-uploaded files statically (only relevant when UPLOAD_STRATEGY=local)
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
