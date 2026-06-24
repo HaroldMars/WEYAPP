@@ -22,7 +22,7 @@ export default function NavRail() {
   return (
     <div className="w-16 bg-ink-950 flex flex-col items-center py-4 justify-between shrink-0">
       <Link to="/" className="w-10 h-10 rounded-xl bg-signal-500 flex items-center justify-center">
-        <MessageCircle className="w-5 h-5 text-white" strokeWidth={2.5} />
+        {/* <MessageCircle className="w-5 h-5 text-white" strokeWidth={2.5} /> */}<p className="text-white font-bold text-2xl">!</p>
       </Link>
 
       <div className="relative" ref={menuRef}>

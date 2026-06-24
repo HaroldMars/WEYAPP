@@ -1,30 +1,23 @@
-import nodemailer from "nodemailer";
+/**
+ * Email sending via Resend (https://resend.com).
+ *
+ * Why Resend instead of Nodemailer + Gmail SMTP: many hosts (including Render's free tier)
+ * block outbound SMTP ports (587/465/25), which makes Gmail SMTP hang with "Connection timeout"
+ * even when your credentials are correct. Resend sends over a normal HTTPS API call (port 443),
+ * which is never blocked, so it works reliably on any host.
+ */
 
-let transporter = null;
-
-const getTransporter = () => {
-  if (transporter) return transporter;
-
-  transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  return transporter;
-};
+const RESEND_API_URL = "https://api.resend.com/emails";
 
 /**
- * Sends an email. In development, if EMAIL_USER/EMAIL_PASS are not configured,
- * it logs the email to the console instead of throwing, so you can keep developing
- * without setting up SMTP immediately.
+ * Sends an email via Resend's HTTP API. In development, if RESEND_API_KEY is not configured,
+ * it logs the email to the console instead of throwing, so you can keep developing without
+ * setting up a real API key immediately.
  */
 export const sendEmail = async ({ to, subject, html }) => {
-  const hasCredentials = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+  const apiKey = process.env.RESEND_API_KEY;
 
-  if (!hasCredentials) {
+  if (!apiKey) {
     console.log("\n========== [email:dev-mode] ==========");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
@@ -33,15 +26,23 @@ export const sendEmail = async ({ to, subject, html }) => {
     return { devMode: true };
   }
 
-  const mailer = getTransporter();
-  const info = await mailer.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to,
-    subject,
-    html,
+  const from = process.env.EMAIL_FROM || "ChatApp <onboarding@resend.dev>";
+
+  const response = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to, subject, html }),
   });
 
-  return info;
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Resend API error (${response.status}): ${errorBody}`);
+  }
+
+  return response.json();
 };
 
 export const sendVerificationEmail = async (to, name, verifyUrl) => {
