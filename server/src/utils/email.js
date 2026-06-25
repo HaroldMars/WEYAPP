@@ -1,24 +1,36 @@
+import nodemailer from "nodemailer";
+
+let transporter = null;
+
+const getTransporter = () => {
+  if (transporter) return transporter;
+
+  transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  return transporter;
+};
+
 /**
- * Email sending via Resend (https://resend.com).
- *
- * Why Resend instead of Nodemailer + Gmail SMTP: many hosts (including Render's free tier)
- * block outbound SMTP ports (587/465/25), which makes Gmail SMTP hang with "Connection timeout"
- * even when your credentials are correct. Resend sends over a normal HTTPS API call (port 443),
- * which is never blocked, so it works reliably on any host.
- */
-
-const RESEND_API_URL = "https://api.resend.com/emails";
-
-
-/**
- * Sends an email via Resend's HTTP API. In development, if RESEND_API_KEY is not configured,
+ * Sends an email via Gmail SMTP. In development, if EMAIL_USER/EMAIL_PASS are not configured,
  * it logs the email to the console instead of throwing, so you can keep developing without
- * setting up a real API key immediately.
+ * setting up SMTP immediately.
+ *
+ * NOTE: many hosting providers (e.g. Render's free tier) block outbound SMTP ports (587/465/25),
+ * which causes this to hang and fail with "Connection timeout" once deployed there, even with
+ * correct credentials. This works reliably on your own machine and on hosts that allow outbound
+ * SMTP (e.g. Railway, a VPS, or paid Render plans). If you hit timeouts after deploying, that's
+ * the cause — either switch hosts/plans, or swap this file for an HTTP-based provider instead.
  */
 export const sendEmail = async ({ to, subject, html }) => {
-  const apiKey = process.env.RESEND_API_KEY;
+  const hasCredentials = process.env.EMAIL_USER && process.env.EMAIL_PASS;
 
-  if (!apiKey) {
+  if (!hasCredentials) {
     console.log("\n========== [email:dev-mode] ==========");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
@@ -27,23 +39,15 @@ export const sendEmail = async ({ to, subject, html }) => {
     return { devMode: true };
   }
 
-  const from = process.env.EMAIL_FROM || "ChatApp <onboarding@resend.dev>";
-
-  const response = await fetch(RESEND_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to, subject, html }),
+  const mailer = getTransporter();
+  const info = await mailer.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to,
+    subject,
+    html,
   });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Resend API error (${response.status}): ${errorBody}`);
-  }
-
-  return response.json();
+  return info;
 };
 
 export const sendVerificationEmail = async (to, name, verifyUrl) => {
