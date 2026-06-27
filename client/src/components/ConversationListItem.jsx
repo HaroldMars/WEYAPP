@@ -22,7 +22,9 @@ export default function ConversationListItem({ conversation, isActive, onClick }
       <Avatar name={peer.name} avatar={peer.avatar} isOnline={isUserOnline(peer.id)} showStatus />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-display font-semibold text-sm text-ink-900 truncate">{peer.name}</span>
+          <span className="font-display font-semibold text-sm text-ink-900 truncate">
+            {peer.nickname || peer.name}
+          </span>
           {conversation.lastMessage && (
             <span className="text-[11px] text-ink-900/40 shrink-0">
               {formatConversationTime(conversation.lastMessage.createdAt)}

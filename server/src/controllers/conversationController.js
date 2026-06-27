@@ -49,6 +49,13 @@ export const createOrGetConversation = async (req, res) => {
       return res.status(400).json({ message: "You cannot start a conversation with yourself." });
     }
 
+    const isFriend = req.user.friends.some((f) => String(f) === String(userId));
+    if (!isFriend) {
+      return res.status(403).json({
+        message: "You can only message people you're friends with. Send a friend request first.",
+      });
+    }
+
     let conversation = await Conversation.findOne({
       isGroup: false,
       participants: { $all: [req.user._id, userId], $size: 2 },

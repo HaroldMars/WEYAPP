@@ -1,98 +1,115 @@
-import { useState } from "react";
-import { Plus, MessageCircleMore } from "lucide-react";
-import NavRail from "../components/NavRail.jsx";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, Users } from "lucide-react";
 import ConversationListItem from "../components/ConversationListItem.jsx";
-import NewChatModal from "../components/NewChatModal.jsx";
-import ChatWindow from "../components/ChatWindow.jsx";
+import FriendRequestBanner from "../components/FriendRequestBanner.jsx";
 import { useConversations } from "../hooks/useConversations.js";
-import { conversationApi } from "../api/conversations.js";
+import { useSocket } from "../context/SocketContext.jsx";
+import { friendApi } from "../api/friends.js";
 
 export default function ChatPage() {
-  const { conversations, isLoading, upsertConversation } = useConversations();
-  const [activeConversationId, setActiveConversationId] = useState(null);
-  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const { conversations, isLoading } = useConversations();
+  const { socket } = useSocket();
+  const navigate = useNavigate();
 
-  const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const [search, setSearch] = useState("");
+  const [incomingRequests, setIncomingRequests] = useState([]);
 
-  const handleSelectUser = async (user) => {
-    setShowNewChatModal(false);
+  const loadRequests = useCallback(async () => {
     try {
-      const data = await conversationApi.createOrGet(user.id);
-      upsertConversation(data.conversation);
-      setActiveConversationId(data.conversation.id);
+      const data = await friendApi.listIncomingRequests();
+      setIncomingRequests(data.requests);
     } catch (err) {
-      console.error("Failed to start conversation:", err.message);
+      console.error("Failed to load friend requests:", err.message);
     }
+  }, []);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  // Real-time: a new request arrives while we're online
+  useEffect(() => {
+    if (!socket) return;
+    const handleNewRequest = (request) => {
+      setIncomingRequests((prev) => [request, ...prev]);
+    };
+    socket.on("friend:request-received", handleNewRequest);
+    return () => socket.off("friend:request-received", handleNewRequest);
+  }, [socket]);
+
+  const handleRequestHandled = (requestId) => {
+    setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId));
   };
 
+  const filteredConversations = conversations.filter((c) => {
+    if (!search.trim()) return true;
+    const peer = c.participants[0];
+    if (!peer) return false;
+    const q = search.toLowerCase();
+    return peer.name.toLowerCase().includes(q) || peer.nickname?.toLowerCase().includes(q);
+  });
+
   return (
-    <div className="h-screen flex bg-paper-50">
-      <NavRail />
+    <div className="min-h-full bg-paper-50 px-4 py-4 flex flex-col gap-4">
+      <h1 className="font-display font-bold text-xl text-ink-900 px-1">WEYAPP!</h1>
 
-      {/* Sidebar */}
-      <div className="w-80 shrink-0 border-r border-ink-900/[0.06] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-5">
-          <h1 className="font-display font-bold text-xl text-ink-900">Chats</h1>
-          <button
-            onClick={() => setShowNewChatModal(true)}
-            className="w-9 h-9 rounded-xl bg-signal-500/10 text-signal-500 flex items-center justify-center hover:bg-signal-500/20 transition-colors"
-            aria-label="New conversation"
-          >
-            <Plus className="w-4.5 h-4.5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {isLoading ? (
-            <div className="px-3 py-2 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 animate-pulse">
-                  <div className="w-11 h-11 rounded-full bg-ink-900/5" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-ink-900/5 rounded w-2/3" />
-                    <div className="h-2.5 bg-ink-900/5 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="flex flex-col items-center text-center px-6 py-12 gap-3">
-              <div className="w-12 h-12 rounded-full bg-signal-500/10 flex items-center justify-center">
-                <MessageCircleMore className="w-6 h-6 text-signal-500" />
-              </div>
-              <p className="text-sm text-ink-900/50">
-                No conversations yet. Start one by adding a person.
-              </p>
-            </div>
-          ) : (
-            conversations.map((c) => (
-              <ConversationListItem
-                key={c.id}
-                conversation={c}
-                isActive={c.id === activeConversationId}
-                onClick={() => setActiveConversationId(c.id)}
-              />
-            ))
-          )}
-        </div>
+      <div className="relative">
+        <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-ink-900/35" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search"
+          className="w-full pl-11 pr-4 py-3 rounded-full bg-ink-900/[0.06] text-sm text-ink-900
+            placeholder:text-ink-900/40 outline-none focus:bg-ink-900/[0.08] transition-colors"
+        />
       </div>
 
-      {/* Active chat window */}
-      <div className="flex-1 flex flex-col">
-        {activeConversation ? (
-          <ChatWindow conversation={activeConversation} />
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-signal-500/10 flex items-center justify-center">
-              <MessageCircleMore className="w-8 h-8 text-signal-500" />
-            </div>
-            <p className="text-ink-900/40 text-sm">Select a conversation or start a new one.</p>
+      {incomingRequests.length > 0 && (
+        <div className="bg-white rounded-xl2 shadow-bubble overflow-hidden">
+          <p className="text-xs font-semibold text-ink-900/50 px-3 pt-3 pb-1">Friend Request</p>
+          <div className="divide-y divide-ink-900/[0.05]">
+            {incomingRequests.map((r) => (
+              <FriendRequestBanner key={r.id} request={r} onHandled={handleRequestHandled} />
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {showNewChatModal && (
-        <NewChatModal onClose={() => setShowNewChatModal(false)} onSelectUser={handleSelectUser} />
+      {isLoading ? (
+        <div className="flex flex-col gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-1 animate-pulse">
+              <div className="w-11 h-11 rounded-full bg-ink-900/5" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 bg-ink-900/5 rounded w-2/3" />
+                <div className="h-2.5 bg-ink-900/5 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredConversations.length === 0 ? (
+        <div className="flex flex-col items-center text-center px-6 py-16 gap-3">
+          <div className="w-12 h-12 rounded-full bg-signal-500/10 flex items-center justify-center">
+            <Users className="w-6 h-6 text-signal-500" />
+          </div>
+          <p className="text-sm text-ink-900/50">
+            {conversations.length === 0
+              ? "No conversations yet. Add a friend to start chatting."
+              : "No chats match your search."}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {filteredConversations.map((c) => (
+            <ConversationListItem
+              key={c.id}
+              conversation={c}
+              isActive={false}
+              onClick={() => navigate(`/chat/${c.id}`)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

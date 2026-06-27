@@ -1,29 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import Avatar from "./Avatar.jsx";
-import { userApi } from "../api/users.js";
+import { friendApi } from "../api/friends.js";
 
 export default function NewChatModal({ onClose, onSelectUser }) {
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState([]);
+  const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadUsers = useCallback(async (query) => {
-    setIsLoading(true);
-    try {
-      const data = await userApi.list(query);
-      setUsers(data.users);
-    } catch (err) {
-      console.error("Failed to load users:", err.message);
-    } finally {
-      setIsLoading(false);
-    }
+  useEffect(() => {
+    friendApi
+      .list()
+      .then((data) => setFriends(data.friends))
+      .catch((err) => console.error("Failed to load friends:", err.message))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => loadUsers(search), 300);
-    return () => clearTimeout(timeout);
-  }, [search, loadUsers]);
+  const filtered = friends.filter((f) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      f.name.toLowerCase().includes(q) ||
+      f.nickname?.toLowerCase().includes(q) ||
+      f.email.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -45,7 +46,7 @@ export default function NewChatModal({ onClose, onSelectUser }) {
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or email..."
+              placeholder="Search your friends..."
               className="w-full pl-9 pr-3 py-2 rounded-xl bg-ink-900/[0.04] text-sm text-ink-900
                 placeholder:text-ink-900/35 outline-none focus:bg-ink-900/[0.06] transition-colors"
             />
@@ -57,19 +58,25 @@ export default function NewChatModal({ onClose, onSelectUser }) {
             <div className="flex justify-center py-8">
               <Loader2 className="w-5 h-5 text-signal-500 animate-spin" />
             </div>
-          ) : users.length === 0 ? (
-            <p className="text-center text-sm text-ink-900/40 py-8">No users found.</p>
+          ) : friends.length === 0 ? (
+            <p className="text-center text-sm text-ink-900/40 px-6 py-8">
+              You don't have any friends yet. Add a friend first, then you can start chatting.
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-sm text-ink-900/40 py-8">No friends match your search.</p>
           ) : (
-            users.map((u) => (
+            filtered.map((f) => (
               <button
-                key={u.id}
-                onClick={() => onSelectUser(u)}
+                key={f.id}
+                onClick={() => onSelectUser(f)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-ink-900/[0.04] transition-colors text-left"
               >
-                <Avatar name={u.name} avatar={u.avatar} size="sm" />
+                <Avatar name={f.name} avatar={f.avatar} size="sm" />
                 <div className="min-w-0">
-                  <p className="font-medium text-sm text-ink-900 truncate">{u.name}</p>
-                  <p className="text-xs text-ink-900/40 truncate">{u.email}</p>
+                  <p className="font-medium text-sm text-ink-900 truncate">
+                    {f.nickname || f.name}
+                  </p>
+                  <p className="text-xs text-ink-900/40 truncate">{f.email}</p>
                 </div>
               </button>
             ))
@@ -79,3 +86,4 @@ export default function NewChatModal({ onClose, onSelectUser }) {
     </div>
   );
 }
+

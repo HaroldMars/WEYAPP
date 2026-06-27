@@ -8,6 +8,8 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import friendRoutes from "./routes/friendRoutes.js";
+import postRoutes from "./routes/postRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,7 +17,6 @@ const app = express();
 
 // ---------- core middleware ----------
 const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split(",");
-
 
 app.use(
   cors({
@@ -26,7 +27,6 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
 
 // Serve locally-uploaded files statically (only relevant when UPLOAD_STRATEGY=local)
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
@@ -41,6 +41,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/friends", friendRoutes);
+app.use("/api/posts", postRoutes);
 
 // ---------- 404 ----------
 app.use("/api", (req, res) => {

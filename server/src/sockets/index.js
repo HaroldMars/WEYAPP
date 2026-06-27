@@ -4,7 +4,6 @@ import User from "../models/User.js";
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
 
-
 // userId -> Set of socket ids (a user can have multiple tabs/devices open)
 const onlineUsers = new Map();
 
@@ -22,6 +21,11 @@ const removeOnlineSocket = (userId, socketId) => {
 
 const isUserOnline = (userId) => onlineUsers.has(String(userId));
 
+let ioInstance = null;
+
+/** Lets REST controllers emit real-time events without circular import issues. */
+export const getIO = () => ioInstance;
+
 export const initSocket = (httpServer) => {
   const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173").split(",");
 
@@ -31,6 +35,8 @@ export const initSocket = (httpServer) => {
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   // ---- Auth middleware for socket handshake ----
   io.use(async (socket, next) => {

@@ -10,6 +10,12 @@ const userSchema = new mongoose.Schema(
       minlength: 2,
       maxlength: 50,
     },
+    nickname: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+      default: "",
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -54,11 +60,17 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );
 
-userSchema.index({ name: "text", email: "text" });
+userSchema.index({ name: "text", nickname: "text", email: "text" });
 
 // Hash password before saving, only if it was modified
 userSchema.pre("save", async function (next) {
@@ -76,6 +88,7 @@ userSchema.methods.toSafeJSON = function () {
   return {
     id: this._id,
     name: this.name,
+    nickname: this.nickname,
     email: this.email,
     avatar: this.avatar,
     phone: this.phone,
@@ -83,6 +96,7 @@ userSchema.methods.toSafeJSON = function () {
     isVerified: this.isVerified,
     isOnline: this.isOnline,
     lastSeen: this.lastSeen,
+    friendCount: Array.isArray(this.friends) ? this.friends.length : 0,
     createdAt: this.createdAt,
   };
 };

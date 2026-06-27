@@ -49,6 +49,12 @@ export const uploadChatImage = multer({
   fileFilter: imageFileFilter,
 });
 
+export const uploadPostImage = multer({
+  storage: makeStorage("post-images"),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
+  fileFilter: imageFileFilter,
+});
+
 /**
  * Given a multer file object, returns a public URL string.
  * If Cloudinary is enabled, uploads the in-memory buffer there first.

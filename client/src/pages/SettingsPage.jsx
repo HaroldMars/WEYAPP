@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { LogOut, User, ChevronRight } from "lucide-react";
-import PageHeader from "../components/PageHeader.jsx";
 import Avatar from "../components/Avatar.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -14,10 +13,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper-50">
-      <PageHeader title="Settings" />
+    <div className="min-h-full bg-paper-50 px-4 py-4">
+      <h1 className="font-display font-bold text-xl text-ink-900 px-1 mb-4">Menu</h1>
 
-      <div className="max-w-md mx-auto px-6 py-8">
+      <div className="max-w-md mx-auto">
         <button
           onClick={() => navigate("/profile")}
           className="w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-white shadow-bubble mb-6
@@ -25,7 +24,9 @@ export default function SettingsPage() {
         >
           <Avatar name={user?.name} avatar={user?.avatar} size="md" />
           <div className="flex-1 min-w-0">
-            <p className="font-display font-semibold text-sm text-ink-900 truncate">{user?.name}</p>
+            <p className="font-display font-semibold text-sm text-ink-900 truncate">
+              {user?.nickname || user?.name}
+            </p>
             <p className="text-xs text-ink-900/40 truncate">{user?.email}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-ink-900/30 shrink-0" />

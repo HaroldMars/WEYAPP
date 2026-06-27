@@ -1,23 +1,50 @@
-import { useState, useRef } from "react";
-import { Camera, Loader2 } from "lucide-react";
-import PageHeader from "../components/PageHeader.jsx";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Camera, Loader2, ChevronLeft } from "lucide-react";
 import Avatar from "../components/Avatar.jsx";
-import TextField from "../components/TextField.jsx";
-import Button from "../components/Button.jsx";
 import Banner from "../components/Banner.jsx";
+import PostComposer from "../components/PostComposer.jsx";
+import PostCard from "../components/PostCard.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { userApi } from "../api/users.js";
+import { postApi } from "../api/posts.js";
 
 export default function ProfilePage() {
   const { user, updateUserLocal } = useAuth();
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [nickname, setNickname] = useState(user?.nickname || "");
   const [bio, setBio] = useState(user?.bio || "");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [isSavingBio, setIsSavingBio] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  const [posts, setPosts] = useState([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+
+  const loadOwnPosts = useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoadingPosts(true);
+    try {
+      const data = await postApi.list({ authorId: user.id });
+      setPosts(data.posts);
+    } catch (err) {
+      console.error("Failed to load your posts:", err.message);
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadOwnPosts();
+  }, [loadOwnPosts]);
+
+  useEffect(() => {
+    setNickname(user?.nickname || "");
+    setBio(user?.bio || "");
+  }, [user?.nickname, user?.bio]);
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
@@ -36,40 +63,66 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setMessage({ type: "", text: "" });
+  const handleNicknameBlur = async () => {
+    if (nickname === (user?.nickname || "")) return;
     try {
-      const data = await userApi.updateProfile({ name, phone, bio });
+      const data = await userApi.updateProfile({ nickname });
       updateUserLocal(data.user);
-      setMessage({ type: "success", text: "Profile updated successfully." });
     } catch (err) {
       setMessage({ type: "error", text: err.message });
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-paper-50">
-      <PageHeader title="Profile" />
+  const handleSaveBio = async () => {
+    setIsSavingBio(true);
+    try {
+      const data = await userApi.updateProfile({ bio });
+      updateUserLocal(data.user);
+      setIsEditingBio(false);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setIsSavingBio(false);
+    }
+  };
 
-      <div className="max-w-md mx-auto px-6 py-8">
-        <div className="flex flex-col items-center gap-3 mb-8">
-          <div className="relative">
-            <Avatar name={user?.name} avatar={user?.avatar} size="xl" />
+  const handlePostCreated = (post) => {
+    setPosts((prev) => [post, ...prev]);
+  };
+
+  const handlePostDeleted = (postId) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
+  return (
+    <div className="min-h-full bg-paper-50">
+      <div className="flex items-center gap-3 px-4 py-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-ink-900/60 hover:bg-ink-900/5 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <h1 className="font-display font-bold text-lg text-ink-900">Account</h1>
+      </div>
+
+      <div className="px-4 flex flex-col gap-4">
+        {message.text && <Banner type={message.type}>{message.text}</Banner>}
+
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0">
+            <Avatar name={user?.name} avatar={user?.avatar} size="lg" />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingAvatar}
-              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-signal-500 text-white
-                flex items-center justify-center ring-2 ring-white hover:bg-signal-400 transition-colors"
+              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-signal-500 text-white
+                flex items-center justify-center ring-2 ring-paper-50 hover:bg-signal-400 transition-colors"
               aria-label="Change profile picture"
             >
               {isUploadingAvatar ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <Camera className="w-3.5 h-3.5" />
+                <Camera className="w-3 h-3" />
               )}
             </button>
             <input
@@ -80,39 +133,93 @@ export default function ProfilePage() {
               className="hidden"
             />
           </div>
-          <p className="text-sm text-ink-900/40">{user?.email}</p>
+
+          <div className="flex-1 min-w-0">
+            <input
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value.slice(0, 30))}
+              onBlur={handleNicknameBlur}
+              placeholder={user?.name}
+              className="w-full font-display font-bold text-lg text-ink-900 bg-transparent outline-none
+                placeholder:text-ink-900/40 border-b border-transparent focus:border-signal-500 transition-colors"
+            />
+            <p className="text-xs text-ink-900/40">{user?.name}</p>
+          </div>
         </div>
 
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
-          {message.text && <Banner type={message.type}>{message.text}</Banner>}
-
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-
-          <TextField
-            label="Phone number"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+1 (555) 000-0000"
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-ink-900/80">About</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value.slice(0, 200))}
-              placeholder="Tell people a little about yourself..."
-              rows={3}
-              className="w-full px-4 py-2.5 rounded-xl border border-ink-900/10 bg-white text-ink-900
-                placeholder:text-ink-900/35 outline-none focus:border-signal-500 transition-colors resize-none"
-            />
-            <span className="text-xs text-ink-900/35 self-end">{bio.length}/200</span>
+        <div className="bg-signal-500/[0.07] rounded-xl2 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-ink-900/60">Description</p>
+            {!isEditingBio && (
+              <button
+                onClick={() => setIsEditingBio(true)}
+                className="text-xs text-signal-500 font-semibold"
+              >
+                Edit
+              </button>
+            )}
           </div>
 
-          <Button type="submit" isLoading={isSaving} className="mt-2">
-            Save changes
-          </Button>
-        </form>
+          {isEditingBio ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 200))}
+                placeholder="Add your description here"
+                rows={3}
+                autoFocus
+                className="w-full bg-white rounded-lg px-3 py-2 text-sm text-ink-900 outline-none
+                  placeholder:text-ink-900/35 resize-none border border-signal-500/30"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-ink-900/35">{bio.length}/200</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setBio(user?.bio || "");
+                      setIsEditingBio(false);
+                    }}
+                    className="text-xs font-semibold text-ink-900/50 px-3 py-1.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveBio}
+                    disabled={isSavingBio}
+                    className="text-xs font-semibold text-white bg-signal-500 px-3 py-1.5 rounded-full disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-900/70">
+              {user?.bio || "Add your description here"}
+            </p>
+          )}
+        </div>
+
+        <PostComposer onCreated={handlePostCreated} placeholder="Add post here" />
+
+        <div>
+          <h2 className="font-display font-bold text-base text-ink-900 mb-3">Post</h2>
+          {isLoadingPosts ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 text-signal-500 animate-spin" />
+            </div>
+          ) : posts.length === 0 ? (
+            <p className="text-sm text-ink-900/40 px-1 pb-6">
+              You haven't posted anything yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3 pb-4">
+              {posts.map((post) => (
+                <PostCard key={post.id} post={post} onDeleted={handlePostDeleted} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

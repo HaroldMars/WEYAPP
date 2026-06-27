@@ -11,7 +11,9 @@ export const listUsers = async (req, res) => {
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
+        { nickname: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -24,13 +26,40 @@ export const listUsers = async (req, res) => {
 };
 
 // ---------- GET /api/users/:id ----------
+// Public profile view - includes friendship status relative to the viewer
 export const getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
-    return res.status(200).json({ user: user.toSafeJSON() });
+
+    const isSelf = String(user._id) === String(req.user._id);
+    const isFriend = req.user.friends.some((f) => String(f) === String(user._id));
+
+    let friendRequestStatus = "none"; // none | sent | received | friends
+    if (isFriend) {
+      friendRequestStatus = "friends";
+    } else if (!isSelf) {
+      const FriendRequest = (await import("../models/FriendRequest.js")).default;
+      const pending = await FriendRequest.findOne({
+        $or: [
+          { sender: req.user._id, recipient: user._id },
+          { sender: user._id, recipient: req.user._id },
+        ],
+        status: "pending",
+      });
+      if (pending) {
+        friendRequestStatus =
+          String(pending.sender) === String(req.user._id) ? "sent" : "received";
+      }
+    }
+
+    return res.status(200).json({
+      user: user.toSafeJSON(),
+      isSelf,
+      friendRequestStatus,
+    });
   } catch (err) {
     console.error("[users:getById]", err);
     return res.status(500).json({ message: "Something went wrong fetching this user." });
@@ -41,9 +70,10 @@ export const getUserById = async (req, res) => {
 // Update profile: name, phone, bio
 export const updateProfile = async (req, res) => {
   try {
-    const { name, phone, bio } = req.body;
+    const { name, nickname, phone, bio } = req.body;
 
     if (name !== undefined) req.user.name = name.trim();
+    if (nickname !== undefined) req.user.nickname = nickname.trim().slice(0, 30);
     if (phone !== undefined) req.user.phone = phone.trim();
     if (bio !== undefined) req.user.bio = bio.trim().slice(0, 200);
 
