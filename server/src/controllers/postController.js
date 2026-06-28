@@ -1,20 +1,42 @@
 import Post from "../models/Post.js";
+import User from "../models/User.js";
 import { resolveUploadedFileUrl } from "../middleware/upload.js";
 
-const shapePost = (post, viewerId) => ({
+// Builds a Map of userId -> safe user JSON for every comment author + reply author
+// on a post, so comments can show real names/avatars without needing Mongoose to
+// populate inside a subdocument array (which doesn't support nested population
+// the way top-level refs do).
+const buildAuthorMap = async (posts) => {
+  const ids = new Set();
+  posts.forEach((p) => {
+    p.comments.forEach((c) => ids.add(String(c.author)));
+  });
+  if (ids.size === 0) return new Map();
+
+  const users = await User.find({ _id: { $in: [...ids] } });
+  const map = new Map();
+  users.forEach((u) => map.set(String(u._id), u.toSafeJSON()));
+  return map;
+};
+
+const shapeComment = (c, authorMap) => ({
+  id: c._id,
+  author: c.deleted ? null : authorMap.get(String(c.author)) || null,
+  text: c.deleted ? "" : c.text,
+  parentId: c.parentId || null,
+  deleted: c.deleted,
+  createdAt: c.createdAt,
+});
+
+const shapePost = (post, viewerId, authorMap) => ({
   id: post._id,
   author: post.author.toSafeJSON ? post.author.toSafeJSON() : post.author,
   text: post.text,
   image: post.image,
   likeCount: post.likes.length,
   likedByMe: viewerId ? post.likes.some((id) => String(id) === String(viewerId)) : false,
-  commentCount: post.comments.length,
-  comments: post.comments.map((c) => ({
-    id: c._id,
-    author: c.author,
-    text: c.text,
-    createdAt: c.createdAt,
-  })),
+  commentCount: post.comments.filter((c) => !c.deleted).length,
+  comments: post.comments.map((c) => shapeComment(c, authorMap)),
   createdAt: post.createdAt,
 });
 
@@ -38,7 +60,7 @@ export const createPost = async (req, res) => {
 
     const populated = await post.populate("author", "-password");
 
-    return res.status(201).json({ post: shapePost(populated, req.user._id) });
+    return res.status(201).json({ post: shapePost(populated, req.user._id, new Map()) });
   } catch (err) {
     console.error("[posts:create]", err);
     return res.status(500).json({ message: "Something went wrong creating your post." });
@@ -61,8 +83,10 @@ export const listPosts = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
+    const authorMap = await buildAuthorMap(posts);
+
     return res.status(200).json({
-      posts: posts.map((p) => shapePost(p, req.user._id)),
+      posts: posts.map((p) => shapePost(p, req.user._id, authorMap)),
       page,
       hasMore: posts.length === limit,
     });
@@ -104,10 +128,11 @@ export const toggleLike = async (req, res) => {
 };
 
 // ---------- POST /api/posts/:id/comments ----------
+// Add a comment, or a reply to an existing comment (pass parentId to reply)
 export const addComment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { text } = req.body;
+    const { text, parentId } = req.body;
 
     if (!text?.trim()) {
       return res.status(400).json({ message: "Comment text is required." });
@@ -118,7 +143,18 @@ export const addComment = async (req, res) => {
       return res.status(404).json({ message: "Post not found." });
     }
 
-    post.comments.push({ author: req.user._id, text: text.trim() });
+    if (parentId) {
+      const parentExists = post.comments.some((c) => String(c._id) === String(parentId));
+      if (!parentExists) {
+        return res.status(400).json({ message: "The comment you're replying to no longer exists." });
+      }
+    }
+
+    post.comments.push({
+      author: req.user._id,
+      text: text.trim(),
+      parentId: parentId || null,
+    });
     await post.save();
 
     const newComment = post.comments[post.comments.length - 1];
@@ -128,13 +164,51 @@ export const addComment = async (req, res) => {
         id: newComment._id,
         author: req.user.toSafeJSON(),
         text: newComment.text,
+        parentId: newComment.parentId,
+        deleted: false,
         createdAt: newComment.createdAt,
       },
-      commentCount: post.comments.length,
+      commentCount: post.comments.filter((c) => !c.deleted).length,
     });
   } catch (err) {
     console.error("[posts:addComment]", err);
     return res.status(500).json({ message: "Something went wrong adding your comment." });
+  }
+};
+
+// ---------- DELETE /api/posts/:id/comments/:commentId ----------
+// Soft-deletes a comment (keeps it as a placeholder so reply threads stay intact).
+// Only the comment's author or the post's author can delete it.
+export const deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    const comment = post.comments.find((c) => String(c._id) === String(commentId));
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found." });
+    }
+
+    const isCommentAuthor = String(comment.author) === String(req.user._id);
+    const isPostAuthor = String(post.author) === String(req.user._id);
+    if (!isCommentAuthor && !isPostAuthor) {
+      return res.status(403).json({ message: "You can only delete your own comments." });
+    }
+
+    comment.deleted = true;
+    await post.save();
+
+    return res.status(200).json({
+      message: "Comment deleted.",
+      commentCount: post.comments.filter((c) => !c.deleted).length,
+    });
+  } catch (err) {
+    console.error("[posts:deleteComment]", err);
+    return res.status(500).json({ message: "Something went wrong deleting the comment." });
   }
 };
 

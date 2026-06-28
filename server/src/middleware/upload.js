@@ -55,6 +55,12 @@ export const uploadPostImage = multer({
   fileFilter: imageFileFilter,
 });
 
+export const uploadGroupAvatar = multer({
+  storage: makeStorage("group-avatars"),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: imageFileFilter,
+});
+
 /**
  * Given a multer file object, returns a public URL string.
  * If Cloudinary is enabled, uploads the in-memory buffer there first.

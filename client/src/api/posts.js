@@ -11,6 +11,9 @@ export const postApi = {
       .then((r) => r.data);
   },
   toggleLike: (postId) => api.post(`/posts/${postId}/like`).then((r) => r.data),
-  addComment: (postId, text) => api.post(`/posts/${postId}/comments`, { text }).then((r) => r.data),
+  addComment: (postId, text, parentId = null) =>
+    api.post(`/posts/${postId}/comments`, { text, parentId }).then((r) => r.data),
+  deleteComment: (postId, commentId) =>
+    api.delete(`/posts/${postId}/comments/${commentId}`).then((r) => r.data),
   delete: (postId) => api.delete(`/posts/${postId}`).then((r) => r.data),
 };

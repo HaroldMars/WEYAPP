@@ -13,6 +13,19 @@ const commentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 1000,
     },
+    parentId: {
+      // null/undefined = top-level comment. Otherwise references another comment's _id
+      // within the same post's comments array, enabling full nested reply threads.
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    deleted: {
+      // Soft delete - keeps the comment's _id alive so replies nested under it
+      // don't lose their parent reference. The UI renders deleted comments as
+      // "[deleted]" placeholders instead of removing them outright.
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

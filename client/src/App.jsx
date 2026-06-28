@@ -11,6 +11,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import ConversationPage from "./pages/ConversationPage.jsx";
+import ChatInfoPage from "./pages/ChatInfoPage.jsx";
+import GroupMembersPage from "./pages/GroupMembersPage.jsx";
 import PostsPage from "./pages/PostsPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import PublicProfilePage from "./pages/PublicProfilePage.jsx";
@@ -37,6 +39,8 @@ export default function App() {
             >
               <Route path="/" element={<ChatPage />} />
               <Route path="/chat/:id" element={<ConversationPage />} />
+              <Route path="/chat/:id/info" element={<ChatInfoPage />} />
+              <Route path="/chat/:id/members" element={<GroupMembersPage />} />
               <Route path="/posts" element={<PostsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/users/:id" element={<PublicProfilePage />} />

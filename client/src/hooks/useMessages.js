@@ -58,14 +58,27 @@ export const useMessages = (conversationId) => {
       setTypingUserId(null);
     };
 
+    const handleDeleted = ({ conversationId: cId, messageId, mode }) => {
+      if (String(cId) !== String(conversationId)) return;
+      if (mode === "everyone") {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId ? { ...m, deletedForEveryone: true, text: "", image: "" } : m
+          )
+        );
+      }
+    };
+
     socket.on("message:new", handleNew);
     socket.on("typing:start", handleTypingStart);
     socket.on("typing:stop", handleTypingStop);
+    socket.on("message:deleted", handleDeleted);
 
     return () => {
       socket.off("message:new", handleNew);
       socket.off("typing:start", handleTypingStart);
       socket.off("typing:stop", handleTypingStop);
+      socket.off("message:deleted", handleDeleted);
       clearTimeout(typingTimeoutRef.current);
     };
   }, [socket, conversationId, user?.id]);
@@ -102,6 +115,27 @@ export const useMessages = (conversationId) => {
     socket?.emit("typing:stop", { conversationId });
   }, [socket, conversationId]);
 
+  const deleteMessage = useCallback(
+    async (messageId, mode) => {
+      try {
+        await conversationApi.deleteMessage(conversationId, messageId, mode);
+        if (mode === "everyone") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId ? { ...m, deletedForEveryone: true, text: "", image: "" } : m
+            )
+          );
+        } else {
+          // "me": just remove it from this device's view
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        }
+      } catch (err) {
+        console.error("[useMessages] failed to delete message:", err.message);
+      }
+    },
+    [conversationId]
+  );
+
   return {
     messages,
     isLoading,
@@ -110,5 +144,6 @@ export const useMessages = (conversationId) => {
     appendImageMessage,
     notifyTyping,
     notifyStopTyping,
+    deleteMessage,
   };
 };

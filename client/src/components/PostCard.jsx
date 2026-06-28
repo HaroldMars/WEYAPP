@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import Avatar from "./Avatar.jsx";
+import CommentThread from "./CommentThread.jsx";
 import { API_URL } from "../api/client.js";
 import { postApi } from "../api/posts.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -26,11 +27,12 @@ export default function PostCard({ post, onDeleted }) {
 
   const isOwnPost = String(post.author.id) === String(user?.id);
   const imageSrc = resolveImageSrc(post.image);
+  const topLevelComments = comments.filter((c) => !c.parentId);
+  const visibleCommentCount = comments.filter((c) => !c.deleted).length;
 
   const handleToggleLike = async () => {
     if (isLiking) return;
     setIsLiking(true);
-    // optimistic update
     const nextLiked = !likedByMe;
     setLikedByMe(nextLiked);
     setLikeCount((c) => (nextLiked ? c + 1 : c - 1));
@@ -39,7 +41,6 @@ export default function PostCard({ post, onDeleted }) {
       setLikeCount(data.likeCount);
       setLikedByMe(data.likedByMe);
     } catch (err) {
-      // revert on failure
       setLikedByMe(!nextLiked);
       setLikeCount((c) => (nextLiked ? c - 1 : c + 1));
       console.error("Failed to toggle like:", err.message);
@@ -61,6 +62,16 @@ export default function PostCard({ post, onDeleted }) {
     } finally {
       setIsSubmittingComment(false);
     }
+  };
+
+  const handleCommentAdded = (comment) => {
+    setComments((prev) => [...prev, comment]);
+  };
+
+  const handleCommentDeleted = (commentId) => {
+    setComments((prev) =>
+      prev.map((c) => (c.id === commentId ? { ...c, deleted: true, text: "", author: null } : c))
+    );
   };
 
   const handleDelete = async () => {
@@ -126,22 +137,22 @@ export default function PostCard({ post, onDeleted }) {
           className="flex items-center gap-1.5 text-sm font-medium text-ink-900/50 hover:text-signal-500 transition-colors"
         >
           <MessageCircle className="w-5 h-5" />
-          {comments.length > 0 && <span>{comments.length.toLocaleString()}</span>}
+          {visibleCommentCount > 0 && <span>{visibleCommentCount.toLocaleString()}</span>}
         </button>
       </div>
 
       {showComments && (
         <div className="border-t border-ink-900/[0.06] px-4 py-3 space-y-3">
-          {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2.5">
-              <Avatar name={c.author.name} avatar={c.author.avatar} size="sm" />
-              <div className="bg-ink-900/[0.04] rounded-xl px-3 py-2 flex-1 min-w-0">
-                <p className="text-xs font-semibold text-ink-900">
-                  {c.author.nickname || c.author.name}
-                </p>
-                <p className="text-sm text-ink-900/80 break-words">{c.text}</p>
-              </div>
-            </div>
+          {topLevelComments.map((c) => (
+            <CommentThread
+              key={c.id}
+              comment={c}
+              allComments={comments}
+              postId={post.id}
+              postAuthorId={post.author.id}
+              onCommentAdded={handleCommentAdded}
+              onCommentDeleted={handleCommentDeleted}
+            />
           ))}
 
           <form onSubmit={handleAddComment} className="flex items-center gap-2 pt-1">

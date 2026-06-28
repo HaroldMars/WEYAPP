@@ -25,6 +25,7 @@ export default function ChatWindow({ conversation, onBack }) {
     appendImageMessage,
     notifyTyping,
     notifyStopTyping,
+    deleteMessage,
   } = useMessages(conversation.id);
 
   const scrollRef = useRef(null);
@@ -66,9 +67,16 @@ export default function ChatWindow({ conversation, onBack }) {
         )}
 
         {isGroup ? (
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-11 h-11 rounded-full bg-signal-500/15 text-signal-500 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5" />
+          <button
+            onClick={() => navigate(`/chat/${conversation.id}/info`)}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          >
+            <div className="w-11 h-11 rounded-full bg-signal-500/15 text-signal-500 flex items-center justify-center shrink-0 overflow-hidden">
+              {conversation.groupAvatar ? (
+                <Avatar name={conversation.groupName} avatar={conversation.groupAvatar} />
+              ) : (
+                <Users className="w-5 h-5" />
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-display font-semibold text-sm text-ink-900 truncate">
@@ -78,10 +86,10 @@ export default function ChatWindow({ conversation, onBack }) {
                 {conversation.participants.length + 1} members
               </p>
             </div>
-          </div>
+          </button>
         ) : (
           <button
-            onClick={() => navigate(`/users/${peer.id}`)}
+            onClick={() => navigate(`/chat/${conversation.id}/info`)}
             className="flex items-center gap-3 flex-1 min-w-0 text-left"
           >
             <Avatar name={peer.name} avatar={peer.avatar} isOnline={peerIsOnline} showStatus />
@@ -120,6 +128,7 @@ export default function ChatWindow({ conversation, onBack }) {
               message={m}
               isOwn={String(m.sender.id) === String(user.id)}
               showSenderName={isGroup}
+              onDelete={deleteMessage}
             />
           ))
         )}
