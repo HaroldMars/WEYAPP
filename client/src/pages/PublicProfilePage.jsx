@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronLeft, UserPlus, Check, Clock, Loader2 } from "lucide-react";
+import { ChevronLeft, UserPlus, Clock, Loader2, MessageCircle } from "lucide-react";
 import Avatar from "../components/Avatar.jsx";
 import PostCard from "../components/PostCard.jsx";
 import { userApi } from "../api/users.js";
 import { friendApi } from "../api/friends.js";
 import { postApi } from "../api/posts.js";
+import { conversationApi } from "../api/conversations.js";
 
 export default function PublicProfilePage() {
   const { id } = useParams();
@@ -16,6 +17,7 @@ export default function PublicProfilePage() {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -51,6 +53,18 @@ export default function PublicProfilePage() {
       console.error("Failed to send friend request:", err.message);
     } finally {
       setIsSendingRequest(false);
+    }
+  };
+
+  const handleGoToChat = async () => {
+    setIsOpeningChat(true);
+    try {
+      const data = await conversationApi.createOrGet(id);
+      navigate(`/chat/${data.conversation.id}`);
+    } catch (err) {
+      console.error("Failed to open conversation:", err.message);
+    } finally {
+      setIsOpeningChat(false);
     }
   };
 
@@ -98,8 +112,8 @@ export default function PublicProfilePage() {
           </div>
 
           {friendStatus === "friends" ? (
-            <span className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mint-500/10 text-mint-500 text-xs font-semibold">
-              <Check className="w-3.5 h-3.5" /> Friends
+            <span className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-signal-500/15 text-signal-500 text-xs font-bold">
+              Friend
             </span>
           ) : friendStatus === "sent" ? (
             <span className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink-900/5 text-ink-900/50 text-xs font-semibold">
@@ -119,6 +133,23 @@ export default function PublicProfilePage() {
             </button>
           )}
         </div>
+
+        {friendStatus === "friends" && (
+          <button
+            onClick={handleGoToChat}
+            disabled={isOpeningChat}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full
+              bg-signal-500/[0.12] text-signal-500 text-sm font-semibold hover:bg-signal-500/[0.18]
+              transition-colors disabled:opacity-50"
+          >
+            {isOpeningChat ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <MessageCircle className="w-4 h-4" />
+            )}
+            Go to message
+          </button>
+        )}
 
         <div className="bg-signal-500/[0.07] rounded-xl2 p-4">
           <p className="text-xs font-semibold text-ink-900/60 mb-1">Description</p>

@@ -10,24 +10,29 @@ export const listConversations = async (req, res) => {
       .populate("lastMessage")
       .sort({ updatedAt: -1 });
 
-    const shaped = conversations.map((c) => ({
-      id: c._id,
-      isGroup: c.isGroup,
-      groupName: c.groupName,
-      participants: c.participants
+    const shaped = conversations.map((c) => {
+      const otherParticipants = c.participants
         .filter((p) => String(p._id) !== String(req.user._id))
-        .map((p) => p.toSafeJSON()),
-      lastMessage: c.lastMessage
-        ? {
-            id: c.lastMessage._id,
-            text: c.lastMessage.text,
-            image: c.lastMessage.image,
-            sender: c.lastMessage.sender,
-            createdAt: c.lastMessage.createdAt,
-          }
-        : null,
-      updatedAt: c.updatedAt,
-    }));
+        .map((p) => p.toSafeJSON());
+
+      return {
+        id: c._id,
+        isGroup: c.isGroup,
+        groupName: c.groupName,
+        groupAvatar: c.groupAvatar,
+        participants: otherParticipants,
+        lastMessage: c.lastMessage
+          ? {
+              id: c.lastMessage._id,
+              text: c.lastMessage.text,
+              image: c.lastMessage.image,
+              sender: c.lastMessage.sender,
+              createdAt: c.lastMessage.createdAt,
+            }
+          : null,
+        updatedAt: c.updatedAt,
+      };
+    });
 
     return res.status(200).json({ conversations: shaped });
   } catch (err) {
@@ -82,6 +87,66 @@ export const createOrGetConversation = async (req, res) => {
   } catch (err) {
     console.error("[conversations:createOrGet]", err);
     return res.status(500).json({ message: "Something went wrong starting this conversation." });
+  }
+};
+
+// ---------- POST /api/conversations/group ----------
+// Create a new group chat with 2+ other friends
+export const createGroupConversation = async (req, res) => {
+  try {
+    const { name, memberIds } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Group name is required." });
+    }
+    if (!Array.isArray(memberIds) || memberIds.length < 2) {
+      return res.status(400).json({
+        message: "Select at least 2 other friends to start a group.",
+      });
+    }
+
+    const uniqueMemberIds = [...new Set(memberIds.map(String))].filter(
+      (id) => id !== String(req.user._id)
+    );
+
+    if (uniqueMemberIds.length < 2) {
+      return res.status(400).json({
+        message: "Select at least 2 other friends to start a group.",
+      });
+    }
+
+    const myFriendIds = new Set(req.user.friends.map(String));
+    const nonFriend = uniqueMemberIds.find((id) => !myFriendIds.has(id));
+    if (nonFriend) {
+      return res.status(403).json({
+        message: "You can only add friends to a group chat.",
+      });
+    }
+
+    const conversation = await Conversation.create({
+      participants: [req.user._id, ...uniqueMemberIds],
+      isGroup: true,
+      groupName: name.trim().slice(0, 50),
+      createdBy: req.user._id,
+    });
+
+    const populated = await conversation.populate("participants", "-password");
+
+    const shaped = {
+      id: populated._id,
+      isGroup: true,
+      groupName: populated.groupName,
+      groupAvatar: populated.groupAvatar,
+      participants: populated.participants
+        .filter((p) => String(p._id) !== String(req.user._id))
+        .map((p) => p.toSafeJSON()),
+      createdAt: populated.createdAt,
+    };
+
+    return res.status(201).json({ conversation: shaped });
+  } catch (err) {
+    console.error("[conversations:createGroup]", err);
+    return res.status(500).json({ message: "Something went wrong creating the group." });
   }
 };
 

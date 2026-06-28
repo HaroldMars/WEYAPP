@@ -17,15 +17,9 @@ const getTransporter = () => {
 };
 
 /**
- * Sends an email via Gmail SMTP. In development, if EMAIL_USER/EMAIL_PASS are not configured,
- * it logs the email to the console instead of throwing, so you can keep developing without
- * setting up SMTP immediately.
- *
- * NOTE: many hosting providers (e.g. Render's free tier) block outbound SMTP ports (587/465/25),
- * which causes this to hang and fail with "Connection timeout" once deployed there, even with
- * correct credentials. This works reliably on your own machine and on hosts that allow outbound
- * SMTP (e.g. Railway, a VPS, or paid Render plans). If you hit timeouts after deploying, that's
- * the cause — either switch hosts/plans, or swap this file for an HTTP-based provider instead.
+ * Sends an email. In development, if EMAIL_USER/EMAIL_PASS are not configured,
+ * it logs the email to the console instead of throwing, so you can keep developing
+ * without setting up SMTP immediately.
  */
 export const sendEmail = async ({ to, subject, html }) => {
   const hasCredentials = process.env.EMAIL_USER && process.env.EMAIL_PASS;

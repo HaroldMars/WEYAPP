@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Users } from "lucide-react";
+import { Search, Users, UsersRound } from "lucide-react";
 import ConversationListItem from "../components/ConversationListItem.jsx";
 import FriendRequestBanner from "../components/FriendRequestBanner.jsx";
+import CreateGroupModal from "../components/CreateGroupModal.jsx";
 import { useConversations } from "../hooks/useConversations.js";
 import { useSocket } from "../context/SocketContext.jsx";
 import { friendApi } from "../api/friends.js";
 
 export default function ChatPage() {
-  const { conversations, isLoading } = useConversations();
+  const { conversations, isLoading, upsertConversation } = useConversations();
   const { socket } = useSocket();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [incomingRequests, setIncomingRequests] = useState([]);
+  const [showGroupModal, setShowGroupModal] = useState(false);
 
   const loadRequests = useCallback(async () => {
     try {
@@ -42,12 +44,21 @@ export default function ChatPage() {
     setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId));
   };
 
+  const handleGroupCreated = (conversation) => {
+    setShowGroupModal(false);
+    upsertConversation(conversation);
+    navigate(`/chat/${conversation.id}`);
+  };
+
+  const conversationDisplayName = (c) => {
+    if (c.isGroup) return c.groupName || "Group chat";
+    return c.participants[0]?.nickname || c.participants[0]?.name || "";
+  };
+
   const filteredConversations = conversations.filter((c) => {
     if (!search.trim()) return true;
-    const peer = c.participants[0];
-    if (!peer) return false;
     const q = search.toLowerCase();
-    return peer.name.toLowerCase().includes(q) || peer.nickname?.toLowerCase().includes(q);
+    return conversationDisplayName(c).toLowerCase().includes(q);
   });
 
   return (
@@ -64,6 +75,16 @@ export default function ChatPage() {
             placeholder:text-ink-900/40 outline-none focus:bg-ink-900/[0.08] transition-colors"
         />
       </div>
+
+      <button
+        onClick={() => setShowGroupModal(true)}
+        className="w-full flex items-center gap-3 px-1 py-1 text-left"
+      >
+        <div className="w-11 h-11 rounded-full bg-signal-500/10 flex items-center justify-center shrink-0">
+          <UsersRound className="w-5 h-5 text-signal-500" />
+        </div>
+        <span className="font-display font-semibold text-sm text-ink-900">Create Group Chats</span>
+      </button>
 
       {incomingRequests.length > 0 && (
         <div className="bg-white rounded-xl2 shadow-bubble overflow-hidden">
@@ -110,6 +131,10 @@ export default function ChatPage() {
             />
           ))}
         </div>
+      )}
+
+      {showGroupModal && (
+        <CreateGroupModal onClose={() => setShowGroupModal(false)} onCreated={handleGroupCreated} />
       )}
     </div>
   );

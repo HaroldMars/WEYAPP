@@ -1,6 +1,10 @@
 import User from "../models/User.js";
 import { resolveUploadedFileUrl } from "../middleware/upload.js";
 
+// Escapes characters that have special meaning in regular expressions so user-typed
+// search text (e.g. a phone number starting with "+") is treated as a literal string.
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ---------- GET /api/users ----------
 // List all users except the logged-in one - used for the "add user to chat" list
 export const listUsers = async (req, res) => {
@@ -9,11 +13,12 @@ export const listUsers = async (req, res) => {
 
     const query = { _id: { $ne: req.user._id } };
     if (search) {
+      const safeSearch = escapeRegex(search.trim());
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { nickname: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
+        { name: { $regex: safeSearch, $options: "i" } },
+        { nickname: { $regex: safeSearch, $options: "i" } },
+        { email: { $regex: safeSearch, $options: "i" } },
+        { phone: { $regex: safeSearch, $options: "i" } },
       ];
     }
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { API_URL } from "../api/client.js";
 import { formatMessageTime } from "../utils/time.js";
 
-export default function MessageBubble({ message, isOwn }) {
+export default function MessageBubble({ message, isOwn, showSenderName = false }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -15,6 +15,11 @@ export default function MessageBubble({ message, isOwn }) {
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"} animate-pop-in`}>
       <div className={`max-w-[72%] flex flex-col ${isOwn ? "items-end" : "items-start"}`}>
+        {showSenderName && !isOwn && (
+          <span className="text-[11px] font-semibold text-ink-900/45 mb-1 px-1">
+            {message.sender.nickname || message.sender.name}
+          </span>
+        )}
         <div
           className={`overflow-hidden shadow-bubble
             ${

@@ -17,6 +17,15 @@ const conversationSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    groupAvatar: {
+      type: String,
+      default: "",
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",

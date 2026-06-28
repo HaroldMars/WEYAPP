@@ -3,6 +3,8 @@ import api from "./client.js";
 export const conversationApi = {
   list: () => api.get("/conversations").then((r) => r.data),
   createOrGet: (userId) => api.post("/conversations", { userId }).then((r) => r.data),
+  createGroup: (name, memberIds) =>
+    api.post("/conversations/group", { name, memberIds }).then((r) => r.data),
   getMessages: (conversationId) =>
     api.get(`/conversations/${conversationId}/messages`).then((r) => r.data),
 };
